@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NQ Options Explorer</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="page">
+
+    <header class="site-header">
+      <div>
+        <h1>NQ Options Explorer</h1>
+        <p class="subtitle">E-mini Nasdaq-100 futures options &middot; time-decay simulator</p>
+      </div>
+      <span class="badge" id="data-badge">Simulated data</span>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <section class="card controls" aria-labelledby="controls-heading">
+      <h2 id="controls-heading" class="visually-hidden">Controls</h2>
+
+      <!-- Row 1: time (the hero control) -->
+      <div class="time-row">
+        <button type="button" id="play" class="btn btn-primary">Play</button>
+        <div class="time-slider">
+          <label for="day" class="ctl-label">Valuation date</label>
+          <input type="range" id="day" class="slider slider-hero" min="0" max="0" step="1" value="0">
+        </div>
+        <div class="time-readout">
+          <div id="day-readout" class="readout-main">Day 0</div>
+          <div id="next-expiry" class="readout-sub"></div>
+        </div>
+      </div>
+
+      <!-- Row 2: market and display controls -->
+      <div class="ctl-row">
+        <div class="ctl">
+          <label for="fut" class="ctl-label">NQ futures</label>
+          <input type="range" id="fut" class="slider" min="20000" max="30000" step="25" value="25000">
+          <output id="fut-readout" for="fut">25,000.00</output>
+        </div>
+        <div class="ctl">
+          <label for="volshift" class="ctl-label">Vol shift</label>
+          <input type="range" id="volshift" class="slider" min="-10" max="10" step="0.5" value="0">
+          <output id="vol-readout" for="volshift">0.0 vol pts</output>
+        </div>
+        <div class="ctl">
+          <label for="metric" class="ctl-label">Surface</label>
+          <select id="metric"></select>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label" id="type-label">Option type</span>
+          <div class="seg" role="group" aria-labelledby="type-label">
+            <button type="button" id="type-call" aria-pressed="true">Call</button>
+            <button type="button" id="type-put" aria-pressed="false">Put</button>
+          </div>
+        </div>
+        <div class="ctl ctl-reset">
+          <button type="button" id="reset" class="btn">Reset</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="layout">
+
+      <section class="card panel panel-surface" aria-labelledby="h-surface">
+        <div class="card-head">
+          <h2 id="h-surface">3D surface</h2>
+        </div>
+        <p id="surface-caption" class="panel-sub"></p>
+        <div id="surface-chart" class="chart-3d" role="img" aria-label="3D surface of the selected metric by strike and days to expiry"></div>
+        <p class="panel-hint">Drag to rotate · scroll to zoom · double-click to reset the view</p>
+      </section>
+
+      <aside class="side">
+
+        <section class="card contract" aria-labelledby="h-contract">
+          <h2 id="h-contract">Contract</h2>
+          <div class="sel-row">
+            <div class="ctl">
+              <label for="expiry" class="ctl-label">Expiry</label>
+              <select id="expiry"></select>
+            </div>
+            <div class="ctl">
+              <label for="strike" class="ctl-label">Strike</label>
+              <select id="strike"></select>
+            </div>
+          </div>
+          <h3 id="contract-title" class="contract-title"></h3>
+          <p id="contract-status" class="status"></p>
+          <dl class="stats">
+            <div class="stat">
+              <dt>Premium</dt>
+              <dd><span id="c-premium"></span><small id="c-premium-usd"></small></dd>
+            </div>
+            <div class="stat">
+              <dt>Implied vol</dt>
+              <dd><span id="c-iv"></span></dd>
+            </div>
+            <div class="stat">
+              <dt>Delta</dt>
+              <dd><span id="c-delta"></span></dd>
+            </div>
+            <div class="stat">
+              <dt>Gamma</dt>
+              <dd><span id="c-gamma"></span></dd>
+            </div>
+            <div class="stat">
+              <dt>Theta</dt>
+              <dd><span id="c-theta"></span><small id="c-theta-usd"></small></dd>
+            </div>
+            <div class="stat">
+              <dt>Vega</dt>
+              <dd><span id="c-vega"></span><small id="c-vega-usd"></small></dd>
+            </div>
+            <div class="stat">
+              <dt>Days to expiry</dt>
+              <dd><span id="c-dte"></span></dd>
+            </div>
+            <div class="stat">
+              <dt>Moneyness K/F</dt>
+              <dd><span id="c-moneyness"></span></dd>
+            </div>
+          </dl>
+          <p id="c-decay" class="decay"></p>
+        </section>
+
+        <section class="card chain" aria-label="Mini chain">
+          <div class="table-wrap">
+            <table class="chain-table">
+              <caption id="chain-caption">Chain</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Call &Delta;</th>
+                  <th scope="col">Call</th>
+                  <th scope="col">Strike</th>
+                  <th scope="col">Put</th>
+                  <th scope="col">Put &Delta;</th>
+                </tr>
+              </thead>
+              <tbody id="chain-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+      </aside>
+
+      <div class="charts-2d">
+        <section class="card panel" aria-labelledby="h-smile">
+          <div class="card-head">
+            <h2 id="h-smile">Volatility smile by expiry</h2>
+            <div class="ramp-key">
+              <span>Short-dated</span>
+              <span id="smile-ramp" class="ramp-bar" role="img" aria-label="Colour key: darker lines are shorter-dated expiries"></span>
+              <span>Long-dated</span>
+            </div>
+          </div>
+          <div id="smile-chart" class="chart-2d" role="img" aria-label="Implied volatility against strike, one line per live expiry"></div>
+        </section>
+
+        <section class="card panel" aria-labelledby="value-title">
+          <div class="card-head">
+            <h2 id="value-title">Value vs futures price</h2>
+          </div>
+          <div id="value-chart" class="chart-2d" role="img" aria-label="Option value against futures price at expiry, day 0 and now"></div>
+        </section>
+      </div>
+
+    </main>
+
+    <footer class="card model-notes" aria-labelledby="h-model">
+      <h2 id="h-model">Model &amp; assumptions</h2>
+      <ul>
+        <li>Data is simulated, not market quotes.</li>
+        <li>Priced with Black-76 (European exercise) on a single NQ futures price; carry differences between quarterly futures are ignored.</li>
+        <li>Vol surface: SSVI (Gatheral&ndash;Jacquier) with equity-style downside skew; time-homogeneous, so each option's smile depends only on time remaining.</li>
+        <li>Rate 4% (discounting only).</li>
+        <li>Calendar: weekly Fridays, monthly 3rd Fridays, quarterly H/M/U/Z; holidays ignored.</li>
+        <li>Theta per calendar day; vega per 1 vol point; $ values use the $20/pt multiplier.</li>
+      </ul>
+      <p>Educational only &mdash; not investment advice.</p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.7.0/plotly.min.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
