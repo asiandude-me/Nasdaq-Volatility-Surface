@@ -24,6 +24,9 @@ MAX_FIT_RMSE = 0.05  # reject a slice whose SVI misses its quotes by > 5 vol poi
 STALE_LAST_DAYS = 4  # lastPrice fallback only if the contract traded recently
 MONEYNESS_BAND = (0.6, 1.4)
 IV_BAND = (0.01, 3.0)
+# Yahoo resets open interest outside the US session; below this share of near-money
+# contracts carrying OI, the snapshot can't support a gamma-exposure estimate.
+MIN_OI_COVERAGE = 0.25
 
 
 @dataclass
@@ -61,9 +64,10 @@ class Slice:
 class SurfaceResult:
     slices: list
     points: pd.DataFrame
-    gex: pd.DataFrame
+    gex: Optional[pd.DataFrame]  # None when the snapshot has no usable open interest
     grid: dict
     calendar: list = field(default_factory=list)
+    coverage: dict = field(default_factory=dict)  # share of near-money contracts with quotes / OI
 
 
 def year_fraction(expiry: dt.date, asof: dt.datetime) -> float:
@@ -174,12 +178,18 @@ def build_surface(snap) -> SurfaceResult:
     if len(fitted) < 3:
         raise RuntimeError(f"Only {len(fitted)} expiries produced a usable smile fit.")
 
+    near = chain[chain["x"].between(0.9, 1.1) & (chain["dte"] <= 60)]
+    coverage = {
+        "two_sided": float((near["source"] == "quote").mean()) if len(near) else 0.0,
+        "open_interest": float((near["open_interest"] > 0).mean()) if len(near) else 0.0,
+    }
     return SurfaceResult(
         slices=slices,
         points=points,
-        gex=_gex_contracts(chain, slices),
+        gex=_gex_contracts(chain, slices) if coverage["open_interest"] >= MIN_OI_COVERAGE else None,
         grid=_grid(fitted, points, spot),
         calendar=_calendar_violations(fitted),
+        coverage=coverage,
     )
 
 

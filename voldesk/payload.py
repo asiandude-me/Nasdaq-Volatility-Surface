@@ -137,7 +137,8 @@ def build_payload(snap, surf, repo=None) -> dict:
             "fan_iv": [_r(row, 5) for row in grid["fan_iv"]],
         },
         "calendar": surf.calendar,
-        "gex": {
+        "coverage": surf.coverage,
+        "gex": None if g is None else {
             "K": _r(g["strike"], 2),
             "T": _r(g["T"], 6),
             "fs": _r(g["F"] / spot, 6),

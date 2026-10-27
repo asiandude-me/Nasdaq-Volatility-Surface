@@ -50,8 +50,12 @@ def main(argv=None):
               f"{snap.chain['expiry'].nunique()} expiries | {len(snap.history)} days of history")
         surf = build_surface(snap)
         fitted = sum(s.fit is not None for s in surf.slices)
+        cov = surf.coverage
         print(f"  {len(surf.points)} OTM implied vols | SVI fitted on {fitted}/{len(surf.slices)} expiries "
-              f"| {len(surf.calendar)} calendar-arb crossings | {len(surf.gex)} contracts for GEX")
+              f"| {len(surf.calendar)} calendar-arb crossings")
+        print(f"  near the money: {cov['two_sided']:.0%} two-sided quotes, {cov['open_interest']:.0%} with open interest")
+        print(f"  GEX: {len(surf.gex)} contracts" if surf.gex is not None
+              else "  GEX: skipped, open interest missing from this snapshot (Yahoo resets it outside US hours)")
         payload = build_payload(snap, surf, repo=os.environ.get("GITHUB_REPOSITORY"))
 
     plotly_js = site.load_plotly(args.inline_plotly or None) if args.inline_plotly is not None else None

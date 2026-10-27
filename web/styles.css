@@ -190,6 +190,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 .chart { width: 100%; height: 380px; }
 .chart.short { height: 248px; }
 .chart.mini { height: 200px; }
+.empty-note { margin: 0; height: 100%; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); font-size: 13px; }
 .tall .chart { height: 600px; }
 [data-panel="smile"] { display: flex; flex-direction: column; }
 [data-panel="smile"] .chart { flex: 1 1 auto; min-height: 380px; }

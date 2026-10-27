@@ -75,3 +75,15 @@ def test_realised_estimators_recover_a_known_vol():
         est = realized_vol(ohlc, 252, method).dropna().mean()
         # Discrete sampling biases range estimators slightly low.
         assert abs(est - sigma) < 0.02, (method, est)
+
+
+def test_gex_is_skipped_when_open_interest_is_missing():
+    # Yahoo zeroes open interest outside US hours; GEX from ~nothing would be misleading.
+    snap = demo.load_demo(seed=5)
+    snap.chain["open_interest"] = 0.0
+    surf = build_surface(snap)
+    assert surf.gex is None
+    assert surf.coverage["open_interest"] == 0.0
+    payload = build_payload(snap, surf)
+    assert payload["gex"] is None
+    json.dumps(payload, allow_nan=False)

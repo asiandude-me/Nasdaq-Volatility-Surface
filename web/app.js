@@ -233,7 +233,8 @@
       { label: '21d realised (Yang–Zhang)', value: pct(rvYZ), foot: `C2C ${pct(SUM.rv21.c2c)} · Parkinson ${pct(SUM.rv21.parkinson)}`, spark: tail(H.rv.yang_zhang) },
       { label: 'Vol risk premium', value: `${volPts(SUM.vrp)}<small>pts</small>`, foot: `30d implied ${SUM.vrp >= 0 ? 'over' : 'under'} 21d realised`, spark: tail(vrpSeries) },
       { label: '25Δ risk reversal · 30d', value: `${volPts(SUM.rr25_30)}<small>pts</small>`, foot: `25Δ fly ${volPts(SUM.bf25_30, 2)} pts` },
-      { label: 'Net dealer gamma', value: usdCompact(gexAll.net), foot: gexAll.flip ? `per 1% move · flip ${num(gexAll.flip)}` : 'per 1% move · no flip in ±12%' },
+      G ? { label: 'Net dealer gamma', value: usdCompact(gexAll.net), foot: gexAll.flip ? `per 1% move · flip ${num(gexAll.flip)}` : 'per 1% move · no flip in ±12%' }
+        : { label: 'Net dealer gamma', value: '—', foot: 'No open interest in this snapshot' },
       nm ? { label: `1σ implied move · ${shortDate(nm.expiry)}`, value: `±${usd(nm.abs)}`, foot: `±${pct(nm.abs / SPOT, 2)} · ${nm.dte}d at ${pct(nm.iv)} ATM` }
         : { label: 'Implied move', value: '—', foot: '' },
     ];
@@ -247,8 +248,8 @@
     notes.push(['Term', Math.abs(slope) < 0.0025
       ? `<strong>Flat term structure</strong>: 30d ${pct(SUM.iv30)} vs 90d ${pct(SUM.iv90)}.`
       : slope > 0
-        ? `<strong>Contango</strong>: 90d ATM ${pct(SUM.iv90)} sits ${volPts(slope)} pts over 30d, the normal calm-market shape.`
-        : `<strong>Backwardation</strong>: 30d ATM ${pct(SUM.iv30)} is ${volPts(-slope)} pts over 90d. Front-end demand like this usually means event or stress pricing.`]);
+        ? `<strong>Contango</strong>: 90d ATM ${pct(SUM.iv90)} sits ${num(slope * 100, 1)} pts over 30d, the normal calm-market shape.`
+        : `<strong>Backwardation</strong>: 30d ATM ${pct(SUM.iv30)} is ${num(-slope * 100, 1)} pts over 90d. Front-end demand like this usually means event or stress pricing.`]);
     notes.push(['Premium', `30d implied is <strong>${volPts(SUM.vrp)} pts ${SUM.vrp >= 0 ? 'above' : 'below'}</strong> 21d Yang–Zhang realised. ` +
       (SUM.vrp >= 0 ? 'Options are priced for more movement than the index has delivered.' : 'The index is moving more than options price, which is unusual and tends not to persist.')]);
     notes.push(['Skew', `25Δ risk reversal at 30d is <strong>${volPts(SUM.rr25_30)} pts</strong>: ` + (SUM.rr25_30 <= 0
@@ -258,7 +259,8 @@
       const vi = SUM.vol_index;
       notes.push(['Level', `${VIX_NAME} at <strong>${num(vi.level * 100)}</strong> is in the ${Math.round(vi.percentile * 100)}th percentile of its 1y range (${num(vi.low * 100, 1)}–${num(vi.high * 100, 1)}).`]);
     }
-    notes.push(['Gamma', gexAll.flip
+    if (!G) notes.push(['Gamma', NO_OI]);
+    else notes.push(['Gamma', gexAll.flip
       ? `Naive dealer gamma is <strong>${usdCompact(gexAll.net)}</strong> per 1% at spot, flipping sign near <strong>${num(gexAll.flip)}</strong> (${signed((gexAll.flip / SPOT - 1) * 100)}% from spot). ` +
         (gexAll.net >= 0 ? 'Long gamma above the flip tends to dampen moves.' : 'Short gamma below the flip tends to amplify moves.')
       : `Naive dealer gamma is <strong>${usdCompact(gexAll.net)}</strong> per 1% with no sign change within ±12% of spot.`]);
@@ -640,8 +642,10 @@
 
   // ================================================================ GEX
   // Dollar gamma per 1% move: Gamma * S^2 * 1% * OI * 100 = OI * S * phi(d1) / (sigma * sqrt(T)).
-  const GN = G.K.length;
-  const GSQRT = Float64Array.from(G.T, (T, i) => G.iv[i] * Math.sqrt(T));
+  // G is null when the snapshot carried no open interest (Yahoo resets it outside US hours).
+  const GN = G ? G.K.length : 0;
+  const GSQRT = G ? Float64Array.from(G.T, (T, i) => G.iv[i] * Math.sqrt(T)) : new Float64Array(0);
+  const NO_OI = 'Open interest is missing from this snapshot. Yahoo resets it outside US market hours, so gamma exposure returns with the next in-session build.';
   function gexContribution(i, S) {
     const v = GSQRT[i], d1 = (Math.log(S * G.fs[i] / G.K[i]) + 0.5 * v * v) / v;
     return (G.c[i] ? 1 : -1) * G.oi[i] * S * npdf(d1) / v;
@@ -953,8 +957,18 @@
     panel('skew', 'chart-skew', renderSkew, skewTable);
     panel('smile', 'chart-smile', renderSmile, smileTable, renderSliceStats);
     panel('pricer', 'chart-pricer', renderPricer, pricerTable, syncPricer);
-    panel('gex', 'chart-gex', renderGex, gexTable, syncGex);
-    panel('gexprofile', 'chart-gexprofile', renderGexProfile, gexProfileTable);
+    if (G) {
+      panel('gex', 'chart-gex', renderGex, gexTable, syncGex);
+      panel('gexprofile', 'chart-gexprofile', renderGexProfile, gexProfileTable);
+    } else {
+      ['gex', 'gexprofile'].forEach(n => {
+        const root = $(`[data-panel="${n}"]`);
+        $('.table-toggle', root).hidden = true;
+        $('.chart', root).innerHTML = `<p class="empty-note">${NO_OI}</p>`;
+      });
+      $('#gex-sub').textContent = '$ gamma per 1% move · unavailable for this snapshot';
+      $('[data-control="gexWindow"]').closest('.filters').hidden = true;
+    }
     panel('price', 'chart-price', renderPrice, priceTable);
     panel('ivrv', 'chart-ivrv', renderIvRv, ivRvTable, syncIvRv);
     panel('vrp', 'chart-vrp', renderVrp, ivRvTable, syncVrp);
