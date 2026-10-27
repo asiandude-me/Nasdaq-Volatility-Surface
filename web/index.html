@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VolDesk · Nasdaq-100 Vol</title>
+<meta name="description" content="Implied volatility surface, skew, dealer gamma and realised-vs-implied analytics for QQQ.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141518'/%3E%3Cpath d='M5 22c4-1 6-10 11-10s6 6 11 4' fill='none' stroke='%233987e5' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>
+  // Apply the saved theme before first paint so there is no flash.
+  try { const t = localStorage.getItem('voldesk-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.7.0/plotly.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#" aria-label="VolDesk home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" class="brand-tile"/><path d="M5 22c4-1 6-10 11-10s6 6 11 4" class="brand-wave"/><path d="M5 26c4-1 6-6 11-6s6 3 11 2" class="brand-wave dim"/></svg>
+      <span>VolDesk</span>
+    </a>
+    <div class="quote" id="quote"></div>
+    <div class="topbar-meta" id="meta"></div>
+    <div class="topbar-actions">
+      <a class="btn ghost" id="refresh-link" target="_blank" rel="noopener" hidden>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>
+        <span>Run update</span>
+      </a>
+      <button class="btn ghost icon-only" id="theme-toggle" type="button" aria-label="Toggle light/dark theme">
+        <svg viewBox="0 0 16 16" aria-hidden="true" class="i-sun"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg>
+        <svg viewBox="0 0 16 16" aria-hidden="true" class="i-moon"><path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <div class="banner" id="demo-banner" hidden>
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1L8 1.5z"/><path d="M8 6v3.5M8 11.5v.5"/></svg>
+    <span><strong>Demo data.</strong> This build uses a synthetic market so the layout can be developed offline. Every number below is simulated. The scheduled build replaces it with live QQQ data.</span>
+  </div>
+
+  <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+  <section class="notes panel" aria-labelledby="notes-title">
+    <div class="notes-head">
+      <h2 id="notes-title">Desk notes</h2>
+      <span class="muted small">Generated from this snapshot</span>
+    </div>
+    <ul id="notes"></ul>
+  </section>
+
+  <div class="section-head"><h2>Surface</h2></div>
+  <div class="grid">
+    <article class="panel span-8 tall" data-panel="surface">
+      <header class="panel-head">
+        <div>
+          <h3>Implied volatility surface</h3>
+          <p class="sub">SVI-fitted OTM vols · moneyness K/S × days to expiry (log)</p>
+        </div>
+        <div class="controls">
+          <div class="seg" data-control="surfaceView" role="group" aria-label="Surface view">
+            <button type="button" data-value="3d">3D</button>
+            <button type="button" data-value="heatmap">Heatmap</button>
+          </div>
+          <button type="button" class="chip-toggle" data-toggle="showQuotes" aria-pressed="false">Quotes</button>
+          <button type="button" class="chip-toggle" data-toggle="orbit" aria-pressed="false">Orbit</button>
+          <button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button>
+        </div>
+      </header>
+      <div class="chart" id="chart-surface"></div>
+    </article>
+    <div class="span-4 stack">
+      <article class="panel" data-panel="term">
+        <header class="panel-head">
+          <div>
+            <h3>Term structure</h3>
+            <p class="sub" id="term-sub">ATM and 25Δ vols by expiry</p>
+          </div>
+          <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+        </header>
+        <div class="chart short" id="chart-term"></div>
+      </article>
+      <article class="panel" data-panel="skew">
+        <header class="panel-head">
+          <div>
+            <h3>Skew term structure</h3>
+            <p class="sub">25Δ risk reversal (call − put) and butterfly, vol pts</p>
+          </div>
+          <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+        </header>
+        <div class="chart short" id="chart-skew"></div>
+      </article>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Smile &amp; pricing</h2></div>
+  <div class="grid">
+    <article class="panel span-7" data-panel="smile">
+      <header class="panel-head">
+        <div>
+          <h3>Smile explorer</h3>
+          <p class="sub">Bid–ask IV bars, mid quotes and SVI fit · pick up to 3 expiries</p>
+        </div>
+        <div class="controls">
+          <div class="seg" data-control="smileX" role="group" aria-label="Smile x-axis">
+            <button type="button" data-value="moneyness">K/S</button>
+            <button type="button" data-value="strike">Strike</button>
+            <button type="button" data-value="delta">Delta</button>
+          </div>
+          <button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button>
+        </div>
+      </header>
+      <div class="expiry-chips" id="expiry-chips" role="group" aria-label="Expiries"></div>
+      <div class="chart" id="chart-smile"></div>
+      <div class="slice-stats" id="slice-stats"></div>
+    </article>
+    <article class="panel span-5" data-panel="pricer">
+      <header class="panel-head">
+        <div>
+          <h3>Option pricer &amp; scenario</h3>
+          <p class="sub">Black-76 off the fitted smile · sticky-strike shocks</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <form class="pricer-form" id="pricer-form" autocomplete="off">
+        <div class="field">
+          <span class="field-label">Type</span>
+          <div class="seg" data-control="pricerType" role="group" aria-label="Option type">
+            <button type="button" data-value="call">Call</button>
+            <button type="button" data-value="put">Put</button>
+          </div>
+        </div>
+        <label class="field">
+          <span class="field-label">Expiry</span>
+          <select id="pr-expiry"></select>
+        </label>
+        <label class="field">
+          <span class="field-label">Strike <output id="pr-strike-out"></output></span>
+          <input type="range" id="pr-strike">
+        </label>
+        <label class="field">
+          <span class="field-label">Spot shock <output id="pr-ds-out"></output></span>
+          <input type="range" id="pr-ds" min="-20" max="20" step="0.5" value="0">
+        </label>
+        <label class="field">
+          <span class="field-label">Vol shock <output id="pr-dv-out"></output></span>
+          <input type="range" id="pr-dv" min="-10" max="10" step="0.5" value="0">
+        </label>
+        <label class="field">
+          <span class="field-label">Horizon <output id="pr-h-out"></output></span>
+          <input type="range" id="pr-h" min="0" step="1" value="0">
+        </label>
+      </form>
+      <div class="pricer-out" id="pricer-out"></div>
+      <div class="chart mini" id="chart-pricer"></div>
+    </article>
+  </div>
+
+  <div class="section-head">
+    <h2>Positioning</h2>
+    <div class="filters">
+      <span class="muted small">Expiries</span>
+      <div class="seg" data-control="gexWindow" role="group" aria-label="GEX expiry window">
+        <button type="button" data-value="all">All</button>
+        <button type="button" data-value="90">≤ 90d</button>
+        <button type="button" data-value="30">≤ 30d</button>
+        <button type="button" data-value="7">≤ 7d</button>
+      </div>
+    </div>
+  </div>
+  <div class="grid">
+    <article class="panel span-7" data-panel="gex">
+      <header class="panel-head">
+        <div>
+          <h3>Dealer gamma exposure by strike</h3>
+          <p class="sub" id="gex-sub">$ gamma per 1% move · calls +, puts −</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <div class="chart" id="chart-gex"></div>
+    </article>
+    <article class="panel span-5" data-panel="gexprofile">
+      <header class="panel-head">
+        <div>
+          <h3>Gamma profile</h3>
+          <p class="sub">Net GEX re-priced across spot · zero crossing = gamma flip</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <div class="chart" id="chart-gexprofile"></div>
+    </article>
+  </div>
+
+  <div class="section-head">
+    <h2>Realised vs implied</h2>
+    <div class="filters">
+      <div class="seg" data-control="range" role="group" aria-label="History range">
+        <button type="button" data-value="126">6M</button>
+        <button type="button" data-value="252">1Y</button>
+        <button type="button" data-value="504">2Y</button>
+        <button type="button" data-value="all">Max</button>
+      </div>
+      <div class="seg" data-control="estimator" role="group" aria-label="Realised vol estimator">
+        <button type="button" data-value="c2c">Close–close</button>
+        <button type="button" data-value="parkinson">Parkinson</button>
+        <button type="button" data-value="garman_klass">Garman–Klass</button>
+        <button type="button" data-value="yang_zhang">Yang–Zhang</button>
+      </div>
+    </div>
+  </div>
+  <div class="grid">
+    <article class="panel span-6" data-panel="price">
+      <header class="panel-head">
+        <div>
+          <h3>Price &amp; implied move cone</h3>
+          <p class="sub">±1σ / ±2σ from the ATM term structure</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <div class="chart" id="chart-price"></div>
+    </article>
+    <article class="panel span-6" data-panel="ivrv">
+      <header class="panel-head">
+        <div>
+          <h3 id="ivrv-title">Implied vs 21d realised</h3>
+          <p class="sub" id="ivrv-sub">Annualised vol</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <div class="chart" id="chart-ivrv"></div>
+    </article>
+    <article class="panel span-6" data-panel="vrp">
+      <header class="panel-head">
+        <div>
+          <h3>Volatility risk premium</h3>
+          <p class="sub" id="vrp-sub">Implied minus trailing realised, vol pts</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <div class="chart short" id="chart-vrp"></div>
+    </article>
+    <article class="panel span-6" data-panel="cone">
+      <header class="panel-head">
+        <div>
+          <h3>Volatility cone</h3>
+          <p class="sub">Realised close–close distribution (bands: min–max, 10–90th, 25–75th) vs today's implied</p>
+        </div>
+        <div class="controls"><button type="button" class="btn ghost icon-only table-toggle" aria-label="Show as table" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.5h12M2 9.8h12M6.5 6.5V13"/></svg></button></div>
+      </header>
+      <div class="chart short" id="chart-cone"></div>
+    </article>
+  </div>
+
+  <div class="section-head"><h2>Model diagnostics</h2></div>
+  <article class="panel" data-panel="svi">
+    <header class="panel-head">
+      <div>
+        <h3>SVI slices &amp; static arbitrage</h3>
+        <p class="sub">Raw SVI per expiry · butterfly via Durrleman g(k) ≥ 0 · calendar via monotone total variance</p>
+      </div>
+      <div class="controls" id="arb-chips"></div>
+    </header>
+    <div class="table-wrap" id="svi-table"></div>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <h4>Method</h4>
+      <ul>
+        <li>Forwards implied per expiry from put–call parity near the money, so dividends and carry come from the market, not an assumption.</li>
+        <li>Implied vols from Black-76 on OTM quotes (bid, mid and ask), then a raw-SVI fit per expiry with spread-weighted robust least squares.</li>
+        <li>25Δ points use undiscounted forward delta. Constant-maturity values interpolate total variance in time.</li>
+        <li>GEX assumes dealers are long calls and short puts, the usual naive convention. Real positioning is unobservable, so read it as a map of where open interest concentrates gamma, not a forecast.</li>
+        <li>Realised vol is annualised over 252 days. The vol cone uses rolling close-to-close windows over the full history.</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Data</h4>
+      <p id="footer-data"></p>
+      <p><a id="json-link" href="data.json">Download the payload (JSON)</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
