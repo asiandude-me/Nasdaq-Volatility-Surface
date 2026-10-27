@@ -1,0 +1,65 @@
+name: Dashboard
+
+on:
+  schedule:
+    # Weekdays at 14:47, 17:47 and 20:47 UTC: mid-morning, early afternoon and around the
+    # US close (cron is UTC, so New York times shift by an hour with daylight saving).
+    - cron: "47 14,17,20 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: Underlying to build
+        default: QQQ
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt pytest
+      - name: Unit tests
+        run: pytest -q
+      - name: Build with live market data
+        env:
+          TICKER: ${{ inputs.ticker || 'QQQ' }}
+        run: python build_dashboard.py "$TICKER"
+      - name: Upload site for Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: Upload preview for the PR
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-preview
+          path: site
+
+  deploy:
+    # A failed build never reaches this job, so the last good snapshot stays live.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
