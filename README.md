@@ -73,8 +73,10 @@ from the last payload in well under a second.
 
 ## Data caveats
 
-- Yahoo Finance quotes are delayed about 15 minutes, and snapshots taken outside market
-  hours are thinner.
+- Yahoo Finance quotes are delayed about 15 minutes.
+- Outside US market hours Yahoo blanks bids, asks and open interest. An off-hours build
+  still works, but it prices from last trades, flags "Market closed · last-trade prices"
+  in the header, and skips GEX. The scheduled builds all run during the session.
 - QQQ options are American-style. Using Black-76 on OTM quotes ignores a small
   early-exercise premium, which is negligible for OTM options.
 

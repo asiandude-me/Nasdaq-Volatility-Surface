@@ -178,6 +178,7 @@
   }
 
   // ================================================================ top bar + KPIs
+  const WARN_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1L8 1.5z"/><path d="M8 6v3.5M8 11.5v.5"/></svg>';
   function renderTopbar() {
     const chg = SPOT - M.prev_close, chgPct = chg / M.prev_close;
     const dir = chg >= 0 ? 'up' : 'down';
@@ -192,7 +193,10 @@
     $('#meta').innerHTML =
       `<span class="pulse${stale ? ' stale' : ''}" title="${stale ? 'Snapshot is over 3 days old' : 'Recent snapshot'}"></span>` +
       `<span>Snapshot ${esc(when)} ET · ${ago}</span>` +
-      (M.demo ? `<span class="badge warn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1L8 1.5z"/><path d="M8 6v3.5M8 11.5v.5"/></svg>Demo data</span>` : '');
+      (M.demo ? `<span class="badge warn">${WARN_SVG}Demo data</span>` : '') +
+      // Outside US hours Yahoo blanks bid/ask, so IVs come from last trades of differing ages.
+      (D.coverage && D.coverage.two_sided < 0.25
+        ? `<span class="badge warn" title="Only ${Math.round(D.coverage.two_sided * 100)}% of near-money contracts had a live bid/ask, so implied vols use last-trade prices">${WARN_SVG}Market closed · last-trade prices</span>` : '');
     $('#demo-banner').hidden = !M.demo;
     if (M.repo) {
       const link = $('#refresh-link');

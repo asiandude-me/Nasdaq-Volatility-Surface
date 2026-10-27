@@ -133,7 +133,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 .quote .chg { font-size: 13px; font-weight: 500; }
 .up { color: var(--good-text); }
 .down { color: var(--neg); }
-.topbar-meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin-left: auto; }
+.topbar-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; color: var(--muted); font-size: 12px; margin-left: auto; }
 .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); animation: pulse 2.4s infinite; }
 .pulse.stale { background: var(--warning); animation: none; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); } 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
